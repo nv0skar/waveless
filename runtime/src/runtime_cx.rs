@@ -101,10 +101,12 @@ impl RuntimeCx {
             if let ExecutionTarget::Http(http_target) = endpoint.execution_target() {
                 let route_parts: CheapVec<Option<CompactString>, 3> = CheapVec::from_buf([
                     Some(prefix.into()),
-                    http_target
-                        .version()
-                        .to_owned()
-                        .map(|version| version.trim_matches('/').into()),
+                    match http_target.version() {
+                        Some(version) if !version.is_empty() => {
+                            Some(version.trim_matches('/').into())
+                        }
+                        _ => None,
+                    },
                     Some(http_target.route().trim_matches('/').into()),
                 ]);
 
