@@ -65,12 +65,6 @@ pub async fn serve(
             .unwrap(),
     );
 
-    // TODO: A POST request to an endpoint invalidates the caches of the GET endpoints with the same route.
-    let cache = CacheLayer::builder(InMemoryBackend::new(4096))
-        .ttl(Duration::from_secs(1)) // TODO: Make this a parameter in the 'project.toml'.
-        .stale_while_revalidate(Duration::from_secs(1))
-        .build();
-
     // Cleans up the governor key pool.
     let governor_limiter = governor_conf.limiter().to_owned();
     tokio::spawn(async move {
@@ -105,7 +99,6 @@ pub async fn serve(
     let router = services::RouterService::new(endpoint_svc, frontend);
 
     let svc = ServiceBuilder::new()
-        .layer(cache)
         .layer(compression)
         .layer(CorsLayer::permissive())
         .layer(TimeoutLayer::with_status_code(

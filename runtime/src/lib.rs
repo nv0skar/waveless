@@ -60,7 +60,6 @@ use tokio_rustls::*;
 use tower::{Layer, Service, ServiceBuilder, util::BoxCloneService};
 use tower_governor::{governor::*, key_extractor::*};
 use tower_http::{compression::*, cors::*, timeout::*};
-use tower_http_cache::prelude::*;
 use tracing::*;
 
 pub type EndpointRouter = DashMap<HttpMethod, Router<Endpoint>>;
