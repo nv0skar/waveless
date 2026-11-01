@@ -84,10 +84,12 @@ impl Default for Endpoints {
 
 /// The main endpoint definition.
 /// This will be then included in the Waveless project's binary.
-#[derive(Clone, Serialize, Deserialize, Constructor, Builder, Getters, Display, Debug)]
+#[derive(
+    Clone, Serialize, Deserialize, Constructor, Builder, Getters, MutGetters, Display, Debug,
+)]
 #[display("{} ({:?}))", id, description)]
 #[builder(default, pattern = "mutable", setter(strip_option))]
-#[getset(get = "pub")]
+#[getset(get = "pub", get_mut = "pub")]
 pub struct Endpoint {
     /// Endpoint's unique identifier
     id: CompactString,
@@ -182,10 +184,12 @@ pub enum ExecutionTarget {
 
 /// The HTTP endpoint definition that will be either created by the user or discovered by the compiler.
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize, Constructor, Builder, Getters, Display, Debug)]
+#[derive(
+    Clone, Serialize, Deserialize, Constructor, Builder, Getters, MutGetters, Display, Debug,
+)]
 #[display("{} -> ({}, {:?})", route, method, version)]
 #[builder(default, pattern = "mutable", setter(strip_option))]
-#[getset(get = "pub")]
+#[getset(get = "pub", get_mut = "pub")]
 pub struct HttpTarget {
     /// Route of the endpoint. Note that this will be prefixed with `{api_prefix}/{version}` (if version is set).
     route: CompactString,
@@ -284,10 +288,12 @@ impl Default for HttpTarget {
 
 /// The socket endpoint definition.
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize, Constructor, Builder, Getters, Display, Debug)]
+#[derive(
+    Clone, Serialize, Deserialize, Constructor, Builder, Getters, MutGetters, Display, Debug,
+)]
 #[display("(Socket) {:?}", executor)]
 #[builder(default, pattern = "mutable", setter(strip_option))]
-#[getset(get = "pub")]
+#[getset(get = "pub", get_mut = "pub")]
 pub struct SocketTarget {
     /// Establishes the endpoint handler.
     #[serde(default, skip_serializing_if = "should_skip_option")]

@@ -5,7 +5,7 @@ resolver = "3"
 
 [workspace.package]
 description = "Bring your data model → generate fast, portable and battle-ready APIs 🚀."
-version = "0.4.2"
+version = "0.4.3"
 homepage = "https://github.com/nv0skar/waveless"
 repository = "https://github.com/nv0skar/waveless"
 edition = "2024"
@@ -26,7 +26,7 @@ rustyrosetta = { git = "https://github.com/nv0skar/RustyRosetta.git", tag = "rus
 boxed_any = { git = "https://github.com/nv0skar/BoxedAny.git" }
 boxed_any_derive = { git = "https://github.com/nv0skar/BoxedAny.git" }
 
-tokio = "1.53"
+tokio = "1.54"
 
 tokio-util = "0.7"
 
@@ -36,9 +36,9 @@ rustls = { version = "0.23", default-features = false }
 futures = "0.3"
 
 serde = { version = "1.0.229", features = ["derive", "rc"] }
-toml = "1.1.6"
+toml = "1.1.8"
 serde_json = "1.0"
-serde_with = { version = "3.23", features = ["chrono"] }
+serde_with = { version = "3.24", features = ["chrono"] }
 
 hyper = "1"
 hyper-util = "0.1"
@@ -61,7 +61,7 @@ sqlx = { version = "0.9.0", features = [
     "json",
     "mysql"
 ] }
-sea-orm = { version = "2.0.3", default-features = false }
+sea-orm = { version = "2.0.4", default-features = false }
 sea-schema = { git = "https://github.com/nv0skar/sea-schema-mysql.git" }
 
 chrono = { version = "0.4.45", default-features = false, features = [
@@ -124,7 +124,7 @@ nestify = "0.3"
 either = { version = "1.18", features = ["serde"] }
 eyre = "0.6"
 color-eyre = "0.6"
-thiserror = "2.0.20"
+thiserror = "2.0.21"
 derive_builder = "0.20"
 derive_more = { version = "2.1", features = ["constructor", "display"] }
 
