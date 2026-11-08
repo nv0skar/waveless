@@ -24,7 +24,7 @@ impl Service<RequestCx> for ExecuteHandler {
             let RequestCx { endpoint, .. } = &cx;
 
             // Retrieves the endpoint's target database.
-            let db_conns = endpoint.get_db_handle()?;
+            let db_conns = endpoint.get_db_handle().await?;
 
             // Force the endpoint to have the HTTP target.
             let ExecutionTarget::Http(http_target) = endpoint.execution_target().to_owned() else {
@@ -51,7 +51,7 @@ impl Service<RequestCx> for ExecuteHandler {
 
             let elapsed = _start_time.elapsed();
 
-            info!("Executed {} in {}ms ({} rounds).", exec_tracing_cx.iter().map(|id| format!("`{}`", id)).collect::<CheapVec<_>>().join(" → "), elapsed.as_millis(), exec_tracing_cx.len());
+            debug!("Executed {} in {}ms ({} rounds).", exec_tracing_cx.iter().map(|id| format!("`{}`", id)).collect::<CheapVec<_>>().join(" → "), elapsed.as_millis(), exec_tracing_cx.len());
 
             let PipelineCx { response, .. } = pipeline_cx;
 

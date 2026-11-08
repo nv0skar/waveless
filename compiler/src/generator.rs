@@ -23,7 +23,7 @@ impl GeneratedEndpoints {
 
         let project = cx.project();
 
-        let db_conns: DbConns = DatabasesManager::acquire().to_owned().into();
+        let db_conns: DbConns = DatabasesManager::acquire().into();
 
         let mut all_endpoints = CheapVec::<_, 0>::new();
 

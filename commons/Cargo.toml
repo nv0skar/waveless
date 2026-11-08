@@ -25,6 +25,7 @@ http-body-util.workspace = true
 bytes.workspace = true
 hex.workspace = true
 compact_str.workspace = true
+dashmap.workspace = true
 typetag.workspace = true
 async-trait.workspace = true
 dyn-clone.workspace = true

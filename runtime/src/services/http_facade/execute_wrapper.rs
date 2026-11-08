@@ -81,28 +81,29 @@ where
                     let headers = response.headers_mut().unwrap();
 
                     for (key, value) in execute_response.headers() {
-                        headers.insert(HeaderName::from_bytes(key.as_bytes()).unwrap(), HeaderValue::from_bytes(value.as_bytes()).unwrap());
+                        headers.insert(
+                            HeaderName::from_bytes(key.as_bytes()).unwrap(),
+                            HeaderValue::from_bytes(value.as_bytes()).unwrap(),
+                        );
                     }
 
                     match execute_response.body() {
-                        Some(BodyValue::Json(value)) => {
-                            Ok(response
-                                .status(execute_response.status())
-                                .body(json_conn_body(value))
-                                .unwrap()
-                            )
-                        }
-                        Some(BodyValue::Any(encode)) => {
-                                Ok(response
-                                    .status(execute_response.status())
-                                    .body(json_conn_body(&json!({
-                                        "data": encode.encode().unwrap()
-                                    })))
-                                    .unwrap())
-                            },
-                        _ => Ok(response.status(execute_response.status()).body(empty_body()).unwrap())
+                        Some(BodyValue::Json(value)) => Ok(response
+                            .status(execute_response.status())
+                            .body(json_conn_body(value))
+                            .unwrap()),
+                        Some(BodyValue::Any(encode)) => Ok(response
+                            .status(execute_response.status())
+                            .body(json_conn_body(&json!({
+                                "data": encode.encode().unwrap()
+                            })))
+                            .unwrap()),
+                        _ => Ok(response
+                            .status(execute_response.status())
+                            .body(empty_body())
+                            .unwrap()),
                     }
-                },
+                }
                 Err(err) => Ok(response
                     .status({
                         match err {
@@ -110,15 +111,21 @@ where
                             RequestError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
                         }
                     })
-                    .body(json_conn_body(&json!({
-                        "error": match err {
-                            RequestError::Expected(_, err) => err,
-                            RequestError::Other(err) => format!("Unexpected error: {}", err).into(),
-                        }
-                    }))
-                    .map_err(|err| eyre!(err)).boxed())
-                    .unwrap()
-                ),
+                    .body(
+                        json_conn_body(&json!({
+                            "error": match &err {
+                                RequestError::Expected(_, err) => err.to_owned(),
+                                RequestError::Other(err) => err.to_owned().to_compact_string(),
+                            },
+                            "trace": match &err {
+                                RequestError::Other(err) => err.chain().skip(1).map(|err| err.to_string()).collect::<CheapVec<_>>(),
+                                _ => CheapVec::from_iter([])
+                            }
+                        }))
+                        .map_err(|err| eyre!(err))
+                        .boxed(),
+                    )
+                    .unwrap()),
             }
         })
     }

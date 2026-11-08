@@ -5,21 +5,23 @@ use crate::*;
 
 use object::*;
 
+/// The maximum number of databases the user's application can connect to.
+pub const DATABASE_LIMIT: usize = 9;
+
+pub static DATABASES_CONNS: OnceLock<databases::DatabasesManager> = OnceLock::new();
+
 pub type DbConns = HashMap<DatabaseId, Arc<dyn AnyDatabaseConnection>>;
 
 /// The database's connections' pools manager.
-#[derive(Clone, Constructor, Debug)]
+#[derive(Constructor, Default, Debug)]
 pub struct DatabasesManager {
-    inner: HashMap<DatabaseId, Arc<dyn AnyDatabaseConnection>>,
-    primary_id: DatabaseId,
+    inner: DashMap<DatabaseId, Arc<dyn AnyDatabaseConnection>>,
+    primary_id: RwLock<Option<CompactString>>,
 }
 
 impl DatabasesManager {
     pub fn acquire() -> &'static Self {
-        DATABASES_CONNS
-            .get()
-            .ok_or(eyre!("Databases connections should have been initialized."))
-            .unwrap()
+        DATABASES_CONNS.get_or_init(|| DatabasesManager::default())
     }
 }
 
@@ -28,16 +30,18 @@ pub trait AnyDatabaseConnection: AnyExt {
     async fn execute(&self, input: DatabaseInput) -> Result<DatabaseOutput>;
 }
 
+#[async_trait]
 pub trait DatabaseConsumer {
     fn databases(&self) -> CheapVec<DatabaseId>;
 
-    fn get_db_handle(&self) -> Result<DbConns> {
+    async fn get_db_handle(&self) -> Result<DbConns> {
         let db_ids = self.databases();
 
         let _db_pool = DatabasesManager::acquire();
 
-        Ok(match db_ids.len() {
-            0 => HashMap::from([_db_pool.primary_db()?]),
+        Ok(match (db_ids.len(), _db_pool.primary_db().await) {
+            (0, Ok(db_conn)) => HashMap::from([db_conn]),
+            (0, Err(_)) => HashMap::from([]),
             _ => _db_pool.search_many(&db_ids)?,
         })
     }
@@ -58,52 +62,135 @@ pub enum DatabaseOutput {
 }
 
 impl DatabasesManager {
-    /// Creates a new databases pools manager and loads it into the [`DATABASES_CONNS`] 's `OnceCell`.
+    /// Loads the given database.
     #[instrument(skip_all)]
-    pub async fn load(databases: CheapVec<project::DatabaseConfig>) -> Result<()> {
-        if !databases.iter().any(|db| *db.is_primary()) {
-            bail!("There is no database set as primary.")
-        };
+    pub async fn load(&self, db_config: project::DatabaseConfig) -> Result<()> {
+        info!("Creating {}'s pool.", db_config.id());
 
-        let mut primary_name: MaybeUninit<CompactString> = MaybeUninit::zeroed();
-
-        let mut inner = HashMap::new();
-
-        for db_config in databases {
-            info!("Creating {}'s pool.", db_config.id());
-
-            let (pool, _) = db_config
-                .connection()
-                .new_conn(
-                    db_config.id().to_owned(),
-                    *db_config.pool_min_size(),
-                    *db_config.pool_max_size(),
-                )
-                .await?;
-
-            if *db_config.is_primary() {
-                primary_name.write(db_config.id().to_owned());
-            }
-
-            inner.insert(db_config.id().to_owned(), pool);
+        if self.inner.contains_key(db_config.id()) {
+            Err(eyre!("The given database id already exists."))?
         }
 
-        let database_pools = DatabasesManager::new(inner, unsafe { primary_name.assume_init() });
+        if self.primary_id.read().await.is_some() && *db_config.is_primary() {
+            Err(eyre!("Cannot set two databases as primary.")
+                .wrap_err("Delete first the primary database, then add this one."))?
+        }
 
-        DATABASES_CONNS.set(database_pools).unwrap();
+        let (pool, _) = db_config
+            .connection()
+            .new_conn(
+                db_config.id().to_owned(),
+                *db_config.pool_min_size(),
+                *db_config.pool_max_size(),
+            )
+            .await?;
+
+        if *db_config.is_primary() {
+            *self.primary_id.write().await = Some(db_config.id().to_owned());
+        }
+
+        self.inner.insert(db_config.id().to_owned(), pool);
+
+        Ok(())
+    }
+
+    /// Loads all the given databases into the pool.
+    /// NOTE: if the pools hasn't been created yet it will be created in this call,
+    /// also note that if it is already initialized the database will added to the pool.
+    #[instrument(skip_all)]
+    pub async fn load_all(&self, databases: CheapVec<project::DatabaseConfig>) -> Result<()> {
+        if !self.inner.is_empty() {
+            info!(
+                "Dropping all previous database connections: {}",
+                self.inner
+                    .iter()
+                    .map(|entry| entry.key().to_owned())
+                    .join_compact(", ")
+            );
+
+            for key in self
+                .inner
+                .iter()
+                .map(|entry| entry.key().to_owned())
+                .collect::<CheapVec<_>>()
+            {
+                self.remove(&key).await?;
+            }
+        }
+
+        // If more than one database is set, ensure there is exactly one marked as primary.
+        if databases.len() > 1 {
+            if databases
+                .iter()
+                .filter(|db| *db.is_primary())
+                .collect::<CheapVec<_>>()
+                .len()
+                != 1
+            {
+                Err(eyre!("Cannot determine the primary database.").suggestion("When setting multiple database backends ensure there is exactly one set as primary."))?
+            };
+        }
+
+        for db_config in databases {
+            self.load(db_config).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Remove a database given it's id.
+    /// NOTE: if there is more that two databases and the target database
+    /// is set as primary this operation will fail.
+    #[instrument(skip_all)]
+    pub async fn remove(&self, id: &DatabaseId) -> Result<()> {
+        // Check whether the target database is primary.
+        {
+            let mut _primary_id_guard = self.primary_id.write().await;
+
+            if let Some(primary_id) = _primary_id_guard.to_owned() {
+                if primary_id == id {
+                    if self.inner.len() > 2 {
+                        Err(eyre!(
+                            "Cannot remove primary database when there is more than 2 databases initialized."
+                        ))?;
+                    }
+
+                    *_primary_id_guard = None;
+                }
+            }
+        }
+
+        let Some(_) = self.inner.remove(id) else {
+            bail!("The given database id does not exist.")
+        };
 
         Ok(())
     }
 
     /// Returns the primary database set for this project if any exists.
-    pub fn primary_db(&self) -> Result<(DatabaseId, Arc<dyn AnyDatabaseConnection>)> {
-        Ok((
-            self.primary_id.to_owned(),
-            self.inner
-                .get(&self.primary_id)
-                .wrap_err("No primary database has been defined for this project.")?
-                .to_owned(),
-        ))
+    /// NOTE: if there's only one database regardless of being marked as primary it will be returned.
+    pub async fn primary_db(&self) -> Result<(DatabaseId, Arc<dyn AnyDatabaseConnection>)> {
+        match (self.primary_id.read().await.to_owned(), self.inner.len()) {
+            (Some(primary_id), _) => Ok((
+                primary_id.to_owned(),
+                self.inner
+                    .get(&primary_id)
+                    .wrap_err(format!(
+                        "Unexpected error, the primary database {} hasn't been found in the pool.",
+                        primary_id
+                    ))?
+                    .to_owned(),
+            )),
+            (None, 1) => Ok(self
+                .inner
+                .iter()
+                .map(|entry| (entry.key().to_owned(), entry.value().to_owned()))
+                .next()
+                .unwrap()),
+            _ => Err(eyre!(
+                "No primary database has been defined for this project."
+            )),
+        }
     }
 
     /// Searches for the database given it's id.
@@ -128,9 +215,15 @@ impl DatabasesManager {
 
 impl Into<DbConns> for DatabasesManager {
     fn into(self) -> DbConns {
+        (&self).into()
+    }
+}
+
+impl<'a> Into<DbConns> for &'a DatabasesManager {
+    fn into(self) -> DbConns {
         self.inner
             .iter()
-            .map(|(id, conn)| (id.to_owned(), conn.to_owned()))
+            .map(|entry| (entry.key().to_owned(), entry.value().to_owned()))
             .collect::<HashMap<_, _>>()
     }
 }

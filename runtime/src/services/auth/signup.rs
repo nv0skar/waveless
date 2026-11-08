@@ -83,7 +83,7 @@ impl Service<RequestCx> for SignUpSvc {
                 }
             };
 
-            let Ok(auth_db) = auth_method.get_db_handle() else {
+            let Ok(auth_db) = auth_method.get_db_handle().await else {
                 return Err(RequestError::Other(eyre!(
                     "Cannot get the database connection for the authentication databases.",
                 )));
@@ -95,7 +95,7 @@ impl Service<RequestCx> for SignUpSvc {
                     // Create a new session.
                     let session_method = auth_config.session();
 
-                    let Ok(session_db) = session_method.get_db_handle() else {
+                    let Ok(session_db) = session_method.get_db_handle().await else {
                         return Err(RequestError::Other(eyre!(
                             "Cannot get the database connection for the session databases.",
                         )));

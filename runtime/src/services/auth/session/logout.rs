@@ -68,7 +68,7 @@ impl Service<RequestCx> for LogoutSvc {
 
             let session_method = auth_config.session();
 
-            let Ok(db_conns) = session_method.get_db_handle() else {
+            let Ok(db_conns) = session_method.get_db_handle().await else {
                 return Err(RequestError::Other(eyre!(
                     "Cannot get the database connection for the session databases.",
                 )));

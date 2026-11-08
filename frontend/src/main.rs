@@ -113,7 +113,9 @@ async fn try_main() -> Result<ResultContext> {
 
             let _config_lock = CompilerCx::acquire().project().config();
 
-            DatabasesManager::load(_config_lock.databases().to_owned()).await?;
+            DatabasesManager::acquire()
+                .load_all(_config_lock.databases().to_owned())
+                .await?;
 
             let build = load::<ObjectArtifact>().await?.left().unwrap();
 
@@ -144,7 +146,9 @@ async fn try_main() -> Result<ResultContext> {
 
             let _config_lock = CompilerCx::acquire().project().config();
 
-            DatabasesManager::load(_config_lock.databases().to_owned()).await?;
+            DatabasesManager::acquire()
+                .load_all(_config_lock.databases().to_owned())
+                .await?;
 
             let buff = load::<Bytes>().await?.right().unwrap();
 
@@ -161,7 +165,8 @@ async fn try_main() -> Result<ResultContext> {
 
                 let _build_lock = RuntimeCx::acquire().build();
 
-                DatabasesManager::load(_build_lock.read().await.config().databases().to_owned())
+                DatabasesManager::acquire()
+                    .load_all(_build_lock.read().await.config().databases().to_owned())
                     .await?;
 
                 if *_build_lock

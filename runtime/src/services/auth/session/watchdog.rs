@@ -75,7 +75,7 @@ where
                 // Loads the session's method's and role's method's databases.
                 let session_method = auth_config.session();
 
-                let Ok(db_conns) = session_method.get_db_handle() else {
+                let Ok(db_conns) = session_method.get_db_handle().await else {
                     return Err(RequestError::Other(eyre!(
                         "Cannot get the database connection for the session databases.",
                     )));
@@ -174,7 +174,7 @@ where
                                 )));
                             };
 
-                            let Ok(role_db) = role_method.get_db_handle() else {
+                            let Ok(role_db) = role_method.get_db_handle().await else {
                                 return Err(RequestError::Other(eyre!(
                                     "Cannot get the database connection for the roles databases."
                                 )));

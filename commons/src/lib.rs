@@ -24,11 +24,10 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::env::current_dir;
 use std::fmt::Debug;
-use std::mem::MaybeUninit;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use boxed_any::*;
 use boxed_any_derive::*;
@@ -38,6 +37,7 @@ use async_trait::*;
 use bytes::Bytes as ConnBytes;
 use color_eyre::Section;
 use compact_str::*;
+use dashmap::*;
 use derive_builder::*;
 use derive_more::{Constructor, Display};
 use dyn_clone::*;
@@ -52,7 +52,7 @@ use iocraft::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{IfIsHumanReadable, json::JsonString, serde_as};
 use thiserror::*;
-use tokio::sync::OnceCell;
+use tokio::sync::RwLock;
 use tracing::*;
 
 pub type ResultContext = CompactString; // TODO: Replace this with custom error types → `thiserror`
@@ -67,11 +67,6 @@ pub type UserId = usize;
 
 /// The binary's prefix.
 pub const BINARY_MAGIC: &'static [u8] = b"waveless_binary";
-
-/// The maximum number of databases the user's application can connect to.
-pub const DATABASE_LIMIT: usize = 9;
-
-pub static DATABASES_CONNS: OnceCell<databases::DatabasesManager> = OnceCell::const_new();
 
 thread_local! {
     pub static BINARY_MODE: Cell<bool> = const { Cell::new(false) }; // This will likely be fixed in the future. https://github.com/serde-rs/serde/issues/1732

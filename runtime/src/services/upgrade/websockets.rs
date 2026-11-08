@@ -93,7 +93,7 @@ impl Service<RequestCx> for WebSocketsSvc {
             }
 
             // Retrieves the endpoint's target database.
-            let db_conns = endpoint.get_db_handle()?;
+            let db_conns = endpoint.get_db_handle().await?;
 
             // Upgrade connection.
             debug!("Upgrading connection to WebSockets.");
