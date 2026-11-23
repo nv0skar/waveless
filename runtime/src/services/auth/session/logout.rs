@@ -47,7 +47,7 @@ impl Service<RequestCx> for LogoutSvc {
                         "Cannot logout as there is no session active.",
                     )))? {
                     ParamValue::Internal(user_id) => Ok(user_id.to_owned()),
-                    _ => Err(RequestError::Expected(
+                    _ => Err(RequestError::new(
                         StatusCode::FORBIDDEN,
                         "User id injection from the client is forbidden. HINT: if you are debugging your app you can try creating a new session manually.".into(),
                     )),
@@ -60,7 +60,7 @@ impl Service<RequestCx> for LogoutSvc {
                     .unwrap() {
                     ParamValue::Internal(token) if !all_sessions => Ok(Some(token.to_owned())),
                     ParamValue::Internal(_) if all_sessions => Ok(None),
-                    _ => Err(RequestError::Expected(
+                    _ => Err(RequestError::new(
                         StatusCode::FORBIDDEN,
                         "Session token injection from the client is forbidden. HINT: if you are debugging your app you can try creating a new session manually.".into(),
                     )),

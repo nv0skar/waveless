@@ -110,7 +110,12 @@ impl RuntimeCx {
                     Some(http_target.route().trim_matches('/').into()),
                 ]);
 
-                let route = route_parts.into_iter().flatten().join_compact("/");
+                let route = route_parts
+                    .into_iter()
+                    .flatten()
+                    .join_compact("/")
+                    .trim_matches('/')
+                    .to_owned();
 
                 if let Some(mut router) = router.get_mut(http_target.method()) {
                     let _ = router.insert(route, endpoint.to_owned()); // the error here is ignored.

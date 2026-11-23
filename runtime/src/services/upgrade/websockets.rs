@@ -42,13 +42,13 @@ impl Service<RequestCx> for WebSocketsSvc {
             {
                 Some(Ok(value)) if !value.is_empty() => value,
                 Some(Err(_)) => {
-                    return Err(RequestError::Expected(
+                    return Err(RequestError::new(
                         StatusCode::BAD_REQUEST,
                         format!("Socket endpoint id format is not valid.").into(),
                     ));
                 }
                 _ => {
-                    return Err(RequestError::Expected(
+                    return Err(RequestError::new(
                         StatusCode::BAD_REQUEST,
                         format!("Socket endpoint id was not specified.").into(),
                     ));
@@ -69,7 +69,7 @@ impl Service<RequestCx> for WebSocketsSvc {
                 })
                 .to_owned()
             else {
-                return Err(RequestError::Expected(
+                return Err(RequestError::new(
                     StatusCode::BAD_REQUEST,
                     format!("Socket endpoint `{}` is not defined.", endpoint_id).into(),
                 ));
@@ -82,7 +82,7 @@ impl Service<RequestCx> for WebSocketsSvc {
             if let AuthLevel::Required = auth.level()
                 && request_params.get("user_id").is_none()
             {
-                return Err(RequestError::Expected(
+                return Err(RequestError::new(
                     StatusCode::UNAUTHORIZED,
                     format!(
                         "Cannot open new socket connection for endpoint `{}`: invalid session.",
@@ -121,7 +121,7 @@ impl Service<RequestCx> for WebSocketsSvc {
                             .await
                     });
                 } else {
-                    return Err(RequestError::Expected(
+                    return Err(RequestError::new(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         format!(
                             "The socket endpoint `{}` doesn't have any executor defined.",

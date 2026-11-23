@@ -15,10 +15,22 @@ pub trait AnySessionMethod: AnyExt + DatabaseConsumer {
     }
 
     /// Get whether a user is authenticated by the given session token.
-    async fn check(&self, db_conns: DbConns, token: CompactString) -> Result<Option<UserId>>;
+    /// If a user exists it will return it's associated id and optionally the authentication
+    /// backend used to create the session.
+    async fn check(
+        &self,
+        db_conns: DbConns,
+        token: CompactString,
+    ) -> Result<Option<(UserId, Option<AuthenticationBackendId>)>>;
 
     /// Create a new session for the given user.
-    async fn new(&self, db_conns: DbConns, user_id: UserId) -> Result<CompactString>;
+    /// NOTE: you may optionally disable active user checks if you set `auth_backend` to `None`.
+    async fn new(
+        &self,
+        db_conns: DbConns,
+        user_id: UserId,
+        auth_backend: Option<AuthenticationBackendId>,
+    ) -> Result<CompactString>;
 
     /// Invalidate all session's of the given user.
     async fn invalidate(

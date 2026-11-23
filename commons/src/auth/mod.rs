@@ -33,4 +33,7 @@ pub trait AnyAuthenticationMethod: AnyExt + DatabaseConsumer {
 
     /// Deletes a user given it's id.
     async fn delete(&self, db_conns: DbConns, user_id: UserId) -> Result<()>;
+
+    /// Check whether a user is active.
+    async fn active(&self, db_conns: DbConns, user_id: UserId) -> Result<bool>;
 }

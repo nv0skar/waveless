@@ -107,19 +107,28 @@ where
                 Err(err) => Ok(response
                     .status({
                         match err {
-                            RequestError::Expected(status, _) => status,
+                            RequestError::Expected {status, ..} => status,
                             RequestError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
                         }
                     })
                     .body(
                         json_conn_body(&json!({
-                            "error": match &err {
-                                RequestError::Expected(_, err) => err.to_owned(),
-                                RequestError::Other(err) => err.to_owned().to_compact_string(),
+                            "error": {
+                                "message": match &err {
+                                    RequestError::Expected { message, .. } => message.to_owned(),
+                                    RequestError::Other(err) => err.to_owned().to_compact_string(),
+                                },
+                                "metadata": match &err {
+                                    RequestError::Expected { metadata: Some(metadata), .. } => match metadata {
+                                        MetadataKind::Map(map) => serde_json::to_value(map).unwrap(),
+                                        MetadataKind::Json(value) => value.to_owned(),
+                                    },
+                                    _ => Default::default(),
+                                },
                             },
-                            "trace": match &err {
+                            "backtrace": match &err {
                                 RequestError::Other(err) => err.chain().skip(1).map(|err| err.to_string()).collect::<CheapVec<_>>(),
-                                _ => CheapVec::from_iter([])
+                                _ => Default::default()
                             }
                         }))
                         .map_err(|err| eyre!(err))

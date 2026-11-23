@@ -32,7 +32,7 @@ impl Service<RequestCx> for ExecuteHandler {
             };
 
             let Some(execution_atom) = http_target.execution_pipeline() else {
-                return Err(RequestError::Expected(
+                return Err(RequestError::new(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     format!("The route doesn't have any executor defined. HINT: Go to your project's endpoints folder and check that '{}' has an executor set.", endpoint.id()).into(),
                 ));

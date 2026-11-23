@@ -4,6 +4,7 @@
 **/pnpm-lock.yaml
 **/*.rs.bk
 **/CHANGELOG.txt
+**/TODO.txt
 **/.env
 **/.local
 **/.log*

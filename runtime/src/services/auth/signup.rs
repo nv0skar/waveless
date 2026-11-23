@@ -52,30 +52,30 @@ impl Service<RequestCx> for SignUpSvc {
                 Err(RequestError::Other(eyre!("Signup is disabled for the current build.")))?;
             }
 
-            let auth_method = {
+            let auth_backend = {
                 if auth_config.backends().len() == 1 {
-                    auth_config.backends().first().unwrap()
+                    auth_config.backends().iter().next().unwrap()
                 } else if let Some(auth_backend_name) = headers.get("AuthenticationType") {
                     // Checks for authentication type header if set.
-                    if let Ok(auth_backend_name) = auth_backend_name.to_str() {
+                    if let Ok(auth_backend_id) = auth_backend_name.to_str() {
                         auth_config
                             .backends()
                             .iter()
-                            .find(|auth_method| auth_method.name() == auth_backend_name)
-                            .ok_or(RequestError::Expected(
+                            .find(|auth_backend| auth_backend.id() == auth_backend_id)
+                            .ok_or(RequestError::new(
                                 StatusCode::BAD_REQUEST,
                                 "Cannot find the requested authentication method."
                                     .into(),
                             ))?
                     } else {
-                        return Err(RequestError::Expected(
+                        return Err(RequestError::new(
                             StatusCode::BAD_REQUEST,
                             "Cannot deserialize the `AuthenticationMethod` header."
                                 .into(),
                         ));
                     }
                 } else {
-                    return Err(RequestError::Expected(
+                    return Err(RequestError::new(
                         StatusCode::BAD_REQUEST,
                         "No authentication method has been set. HINT: set one using the `AuthenticationMethod` header."
                             .into(),
@@ -83,14 +83,14 @@ impl Service<RequestCx> for SignUpSvc {
                 }
             };
 
-            let Ok(auth_db) = auth_method.get_db_handle().await else {
+            let Ok(auth_db) = auth_backend.method().get_db_handle().await else {
                 return Err(RequestError::Other(eyre!(
                     "Cannot get the database connection for the authentication databases.",
                 )));
             };
 
             // Create a new user.
-            match auth_method.new(auth_db, request_params).await {
+            match auth_backend.method().new(auth_db, request_params).await {
                 Ok(user_id) => {
                     // Create a new session.
                     let session_method = auth_config.session();
@@ -103,7 +103,7 @@ impl Service<RequestCx> for SignUpSvc {
 
                     let session_token =
                         session_method
-                            .new(session_db, user_id)
+                            .new(session_db, user_id, Some(auth_backend.id().to_owned()))
                             .await
                             .map_err(|err| {
                                 RequestError::Other(eyre!(

@@ -5,6 +5,7 @@ pub mod auth;
 pub mod databases;
 pub mod endpoint;
 pub mod entry;
+pub mod error;
 pub mod http_executor;
 pub mod logging;
 pub mod object;
@@ -16,14 +17,16 @@ pub mod runtime;
 
 mod serialize_utils;
 
+pub use error::*;
 pub use serialize_utils::*;
 
 use std::any::Any;
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::env::current_dir;
 use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -58,6 +61,7 @@ use tracing::*;
 pub type ResultContext = CompactString; // TODO: Replace this with custom error types → `thiserror`
 
 pub type DatabaseId = CompactString;
+pub type AuthenticationBackendId = CompactString;
 pub type DataSchemaDiscoveryMethodId = CompactString;
 pub type ExternalDriverId = CompactString;
 
@@ -76,12 +80,14 @@ pub trait AnyExt: Any + BoxedAny + DynClone + Send + Sync + Debug {
     fn name(&self) -> &str;
 }
 
-#[derive(Error, Debug)]
-pub enum RequestError {
-    #[error("Request error.")]
-    Expected(StatusCode, CompactString),
-    #[error(transparent)]
-    Other(#[from] eyre::Error),
+/// Kinds of metadata:
+/// NOTE: the `Json` variant is recommended when the error metadata is a nested structure
+/// or concrete types aren't known beforehand but are known to implement `Serialize`.
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum MetadataKind {
+    Map(HashMap<CompactString, CompactString>),
+    Json(serde_json::Value),
 }
 
 /// Tries to find the project's workspace root path.

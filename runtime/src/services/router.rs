@@ -185,6 +185,36 @@ where
                         }
                     };
 
+                    // Check whether the endpoint is reachable.
+                    if !*matched.value.reachability() {
+                        return Box::pin(async move {
+                            let response = Response::builder()
+                                .header("Content-Type", "application/json; charset=utf-8")
+                                .header(
+                                    "Cache-Control",
+                                    format!(
+                                        "max-age={}",
+                                        (*RuntimeCx::acquire()
+                                            .build()
+                                            .read()
+                                            .await
+                                            .executor()
+                                            .http_cache_time())
+                                            as u32
+                                    ),
+                                );
+
+                            Ok(response
+                                .status(302)
+                                .body(json_conn_body(&json!({
+                                    "error": format!(
+                                        "Route `{}` is marked as unreachable.",
+                                        route)
+                                })))
+                                .unwrap())
+                        });
+                    }
+
                     // Extracts the path's params.
                     let mut path_params = HashMap::<CompactString, ParamValue>::new();
 

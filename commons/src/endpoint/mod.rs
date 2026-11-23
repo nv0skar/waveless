@@ -112,6 +112,14 @@ pub struct Endpoint {
     /// Whether to require auth.
     auth: Auth,
 
+    /// Metadata.
+    #[serde(default, skip_serializing_if = "should_skip_option")]
+    metadata: Option<MetadataKind>,
+
+    /// Reachability.
+    #[serde(default = "defaults_true", skip_serializing_if = "not_skip")]
+    reachability: bool,
+
     /// Whether this endpoint is deprecated.
     #[serde(default, skip_serializing_if = "should_skip")]
     deprecated: bool,
@@ -138,6 +146,8 @@ impl Default for Endpoint {
             description: None,
             tags: CheapVec::new_const(),
             auth: Default::default(),
+            metadata: Default::default(),
+            reachability: true,
             deprecated: false,
         }
     }

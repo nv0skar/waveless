@@ -90,7 +90,7 @@ where
                             // TODO: future connections from the same origin
                             // may be throttled.
 
-                            return Err(RequestError::Expected(
+                            return Err(RequestError::new(
                                 StatusCode::BAD_REQUEST,
                                 "Malformed auth header.".into(),
                             ));
@@ -118,7 +118,7 @@ where
                         } else {
                             // TODO: future connections from the same origin
                             // may be throttled.
-                            return Err(RequestError::Expected(
+                            return Err(RequestError::new(
                                 StatusCode::BAD_REQUEST,
                                 "Malformed cookie header.".into(),
                             ));
@@ -129,7 +129,7 @@ where
 
                 let Some(token) = token else {
                     if let AuthLevel::Required = auth.level() {
-                        return Err(RequestError::Expected(
+                        return Err(RequestError::new(
                             StatusCode::UNAUTHORIZED,
                             format!("'{}' requires authentication.", endpoint.id()).into(),
                         ));
@@ -141,13 +141,31 @@ where
 
                 let session_check = session_method
                     .check(db_conns, token.into())
-                    .await
-                    .map_err(|err| {
-                        RequestError::Other(eyre!("Cannot check the session token. {}", err))
-                })?;
+                    .await.wrap_err("Cannot check the session token.")?;
 
                 match session_check {
-                    Some(user_id) => {
+                    Some((user_id, auth_backend_id)) => {
+                        // Check whether the user is active using the given auth backend.
+                        if let Some(auth_backend_id) = auth_backend_id {
+                            if let Some(auth_backend) = auth_config.backends().iter().find(|auth_backend| auth_backend.id() == auth_backend_id) {
+                                let Ok(auth_db) = auth_backend.method().get_db_handle().await else {
+                                    return Err(RequestError::Other(eyre!(
+                                        "Cannot get the database connection for the session databases.",
+                                    )));
+                                };
+
+                                if !auth_backend.method().active(auth_db, user_id).await? {
+                                    return Err(RequestError::new(
+                                        StatusCode::UNAUTHORIZED,
+                                        format!("The user `{}` is disabled in the auth backend `{}`.", user_id, auth_backend_id).into(),
+                                    ));
+                                };
+
+                            } else {
+                                Err(eyre!("Cannot find the authentication backend for the session `{}`s", token))?;
+                            };
+                        }
+
                         // Inject user id if required.
                         match auth.level() {
                             AuthLevel::Required | AuthLevel::InjectWhenAvailable => {
@@ -187,7 +205,7 @@ where
                             };
 
                             let Some(role) = role_check else {
-                                return Err(RequestError::Expected(
+                                return Err(RequestError::new(
                                     StatusCode::UNAUTHORIZED,
                                     "Current user does not have any role.".into(),
                                 ));
@@ -196,7 +214,7 @@ where
                             if auth.allowed_roles().contains(&role.to_lowercase()) {
                                 break 'auth_flow;
                             } else {
-                                return Err(RequestError::Expected(
+                                return Err(RequestError::new(
                                     StatusCode::UNAUTHORIZED,
                                     "Current user does not have any of the allowed roles.".into(),
                                 ));
@@ -204,7 +222,7 @@ where
                         }
                     }
                     None if let AuthLevel::Required = auth.level() => {
-                        return Err(RequestError::Expected(
+                        return Err(RequestError::new(
                             StatusCode::UNAUTHORIZED,
                             "Invalid session.".into(),
                         ))

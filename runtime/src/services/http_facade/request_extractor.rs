@@ -90,7 +90,7 @@ where
                         .collect()
                         .await
                         .map_err(|err| {
-                            RequestError::Expected(
+                            RequestError::new(
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 format!("Cannot get request's body. {}", err).into(),
                             )
@@ -105,7 +105,7 @@ where
                             body_bytes.iter().as_slice(),
                         ),
                     }) else {
-                        return Err(RequestError::Expected(
+                        return Err(RequestError::new(
                             StatusCode::BAD_REQUEST,
                             "Invalid request's body. The provided JSON's format is unsupported."
                                 .into(),
@@ -113,7 +113,7 @@ where
                     };
 
                     if *http_target.capture_all_params() {
-                        for (key, value) in json_body.as_object().ok_or(RequestError::Expected(
+                        for (key, value) in json_body.as_object().ok_or(RequestError::new(
                             StatusCode::BAD_REQUEST,
                             "Cannot extract the parameters from the request's body.".into(),
                         ))? {
@@ -133,7 +133,7 @@ where
                             let value = {
                                 match json_body
                                     .as_object()
-                                    .ok_or(RequestError::Expected(
+                                    .ok_or(RequestError::new(
                                         StatusCode::BAD_REQUEST,
                                         "Cannot extract the parameters from the request's body."
                                             .into(),
@@ -159,7 +159,7 @@ where
                         Full::new(ConnBytes::from_iter(body_bytes)).map_err(|_| unreachable!()),
                     );
                 } else if !http_target.body_params().is_empty() {
-                    return Err(RequestError::Expected(
+                    return Err(RequestError::new(
                         StatusCode::BAD_REQUEST,
                         "The request's body for this endpoint cannot be empty.".into(),
                     ));

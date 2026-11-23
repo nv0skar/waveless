@@ -282,9 +282,8 @@ impl AnyEndpointGenerator for ExternalEndpointGenerator {
 #[getset(get = "pub", get_mut = "pub")]
 pub struct Authentication {
     /// All the available methods to authenticate.
-    #[serde(default, skip_serializing_if = "should_skip_cheapvec")]
-    #[serde_as(as = "IfIsHumanReadable<_, JsonString>")] // Explore müsli to avoid this.
-    backends: CheapVec<Arc<dyn AnyAuthenticationMethod>, 0>,
+    #[serde(default, skip_serializing_if = "should_skip_hashset")]
+    backends: HashSet<AuthenticationBackend>,
 
     /// The method for manage sessions.
     #[serde_as(as = "IfIsHumanReadable<_, JsonString>")] // Explore müsli to avoid this.
@@ -310,6 +309,30 @@ pub struct Authentication {
 impl PartialEq for Authentication {
     fn eq(&self, other: &Self) -> bool {
         self.default_role == other.default_role && self.allow_signup == other.allow_signup
+    }
+}
+
+#[serde_as]
+#[derive(Clone, Constructor, Serialize, Deserialize, Getters, MutGetters, Debug)]
+#[getset(get = "pub", get_mut = "pub")]
+pub struct AuthenticationBackend {
+    id: AuthenticationBackendId,
+
+    #[serde_as(as = "IfIsHumanReadable<_, JsonString>")] // Explore müsli to avoid this.
+    method: Arc<dyn AnyAuthenticationMethod>,
+}
+
+impl Eq for AuthenticationBackend {}
+
+impl Hash for AuthenticationBackend {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl PartialEq for AuthenticationBackend {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
     }
 }
 

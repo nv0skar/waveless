@@ -30,3 +30,21 @@ pub fn should_skip_cheapvec<T>(data: &CheapVec<T>) -> bool {
     }
     false
 }
+
+/// Workaround of <https://github.com/serde-rs/serde/issues/1732> for `HashSet<T>`
+pub fn should_skip_hashset<T>(data: &HashSet<T>) -> bool {
+    if !BINARY_MODE.with(|var| var.get()) {
+        if data.is_empty() {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn defaults_true() -> bool {
+    true
+}
+
+pub fn not_skip(value: &bool) -> bool {
+    should_skip(&(!*value))
+}

@@ -47,30 +47,30 @@ impl Service<RequestCx> for LoginSvc {
                     "Authentication is not set for the current build."
                 )))?;
 
-            let auth_method = {
+            let auth_backend = {
                 if auth_config.backends().len() == 1 {
-                    auth_config.backends().first().unwrap()
+                    auth_config.backends().iter().next().unwrap()
                 } else if let Some(auth_backend_name) = headers.get("AuthenticationType") {
                     // Checks for authentication type header if set.
-                    if let Ok(auth_backend_name) = auth_backend_name.to_str() {
+                    if let Ok(auth_backend_id) = auth_backend_name.to_str() {
                         auth_config
                             .backends()
                             .iter()
-                            .find(|auth_method| auth_method.name() == auth_backend_name)
-                            .ok_or(RequestError::Expected(
+                            .find(|auth_method| auth_method.id() == auth_backend_id)
+                            .ok_or(RequestError::new(
                                 StatusCode::BAD_REQUEST,
                                 "Cannot find the requested authentication method."
                                     .into(),
                             ))?
                     } else {
-                        return Err(RequestError::Expected(
+                        return Err(RequestError::new(
                             StatusCode::BAD_REQUEST,
                             "Cannot deserialize the `AuthenticationMethod` header."
                                 .into(),
                         ));
                     }
                 } else {
-                    return Err(RequestError::Expected(
+                    return Err(RequestError::new(
                         StatusCode::BAD_REQUEST,
                         "No authentication method has been set. HINT: set one using the `AuthenticationMethod` header."
                             .into(),
@@ -78,13 +78,13 @@ impl Service<RequestCx> for LoginSvc {
                 }
             };
 
-            let Ok(auth_db_conns) = auth_method.get_db_handle().await else {
+            let Ok(auth_db_conns) = auth_backend.method().get_db_handle().await else {
                 return Err(RequestError::Other(eyre!(
                     "Cannot get the database connection for the authentication databases."
                 )));
             };
 
-            match auth_method.check(auth_db_conns, request_params).await {
+            match auth_backend.method().check(auth_db_conns, request_params).await {
                 Ok(Some(user_id)) => {
                     // Create a new session.
                     let session_method = auth_config.session();
@@ -97,7 +97,7 @@ impl Service<RequestCx> for LoginSvc {
 
                     let session_token =
                         session_method
-                            .new(session_db_conns, user_id)
+                            .new(session_db_conns, user_id, Some(auth_backend.id().to_owned()))
                             .await
                             .map_err(|err| {
                                 RequestError::Other(eyre!(
@@ -128,7 +128,7 @@ impl Service<RequestCx> for LoginSvc {
                         }),
                     ))))
                 }
-                Ok(None) => Err(RequestError::Expected(
+                Ok(None) => Err(RequestError::new(
                     StatusCode::FORBIDDEN,
                     format!("Login failed, invalid credentials.").into(),
                 )),
